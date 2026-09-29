@@ -197,7 +197,7 @@ function recipeCard(a) {
   const st = a.miss.length === 0 ? '<span class="bdg ok">바로 가능</span>' : `<span class="bdg muted">${a.miss.length}개 부족</span>`;
   return `<div class="card rc" data-act="recipe" data-id="${r.id}">
     <div class="t">${esc(r.name)} ${st}</div>
-    <div class="small muted">${esc(r.cat)} · ${r.base}인분 · ${r.min}분${r.note ? ' ' + esc(r.note) : ''}</div>
+    <div class="small muted">${esc(r.cat)} · ${r.base}인분 · ${r.min}분${r.note ? ' ' + esc(r.note) : ''}${r.yt && !r.ref ? ` · <b style="color:var(--bad)">▶ ${esc(r.yt.ch)}</b>` : ''}</div>
     <div class="bar"><i style="width:${Math.round(a.pct * 100)}%"></i></div>
     <div class="ings">${ings}</div>
     ${tags.trim() ? `<div>${tags}</div>` : ''}</div>`;
@@ -344,7 +344,11 @@ function recipeSheet(id) {
   const r = window.RECIPES.find((x) => x.id === id); if (!r) return '';
   const a = analyze(r);
   const n = ui.serv[id] || r.base, f = n / r.base;
-  const yt = `https://www.youtube.com/results?search_query=${encodeURIComponent(r.name + ' 레시피')}`;
+  const yt = r.yt ? `https://www.youtube.com/watch?v=${r.yt.id}` : `https://www.youtube.com/results?search_query=${encodeURIComponent(r.name + ' 레시피')}`;
+  const srcNote = r.yt && !r.ref
+    ? `<div class="note" style="margin-top:12px"><b>▶ ${esc(r.yt.ch)}</b> — 「${esc(r.yt.t)}」 영상의 분량과 순서 기준 (자막 ${esc(r.yt.cc || '')}으로 확인, 설명은 요약).${r.check ? `<div class="small" style="margin-top:4px">⚠ ${esc(r.check)}</div>` : ''}</div>`
+    : r.yt ? `<p class="small muted">구독 채널 참고 영상: <b>${esc(r.yt.ch)}</b> 「${esc(r.yt.t)}」 — 분량은 여러 레시피의 공통 비율로 정리한 표준 레시피예요.</p>`
+    : `<p class="small muted">구독 채널에 이 요리 영상이 없어 여러 레시피(만개의레시피·유튜브 인기 영상)의 공통 비율로 정리한 표준 레시피예요.</p>`;
   const row = (x) => {
     const st = x.staple ? '<span class="muted">·</span>' : x.ok ? '<span class="have">✓</span>' : x.opt ? '<span class="muted">○</span>' : '<span class="miss">✗</span>';
     const deal = !x.ok && !x.staple ? dealFor(x.k) : null;
@@ -361,9 +365,10 @@ function recipeSheet(id) {
   <p class="small muted">1큰술 = 15ml(밥숟가락 수북이) · 1작은술 = 5ml · 1컵 = 200ml(종이컵)</p>
   <h2>만드는 법</h2><ol class="steps">${r.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
   ${r.tips?.length ? `<h2>팁</h2><ul class="tips">${r.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
-  <p class="small muted">여러 레시피(만개의레시피·유튜브 인기 영상)의 공통 비율로 정리한 표준 레시피예요. 간은 80%만 넣고 맛보며 추가하세요.</p>
+  ${srcNote}
+  <p class="small muted">간은 적힌 양의 80%만 넣고 맛보며 추가하세요.</p>
   <div class="btns">
-    <a class="btn" href="${yt}" target="_blank" rel="noopener">▶ 유튜브 영상</a>
+    <a class="btn" href="${yt}" target="_blank" rel="noopener">▶ ${r.yt ? esc(r.yt.ch) + ' 영상' : '유튜브 검색'}</a>
     <button class="btn pri" data-act="cooked" data-id="${id}">다 만들었어요 → 남은 요리 등록</button>
   </div></div>`;
 }
