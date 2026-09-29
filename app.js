@@ -163,7 +163,7 @@ function amount(i, f) {
 }
 
 // ─────────────────────────── UI 상태
-const ui = { view: 'home', filter: 'all', q: '', cookCat: '전체', cookMode: 'all', store: '전체', month: today().getMonth() + 1, serv: {} };
+const ui = { view: 'home', filter: 'all', q: '', cookCat: '전체', cookMode: 'all', store: '전체', vs: '전체', month: today().getMonth() + 1, serv: {} };
 
 function render() {
   const v = VIEWS[ui.view] || VIEWS.home;
@@ -242,7 +242,7 @@ VIEWS.home = () => {
     ${d ? `<span class="bdg bad">할인 ${esc(d.price || '')}</span>` : `<span class="bdg muted">+${h.recipes.length}메뉴</span>`}</div>`; }).join('')}</div>` : ''}
 
   <h2>🏷️ 마트 할인 <a class="more" data-act="nav" data-view="market">전체 →</a></h2>
-  ${deals.length ? `<div class="card list">${deals.slice(0, 5).map(dealRow).join('')}</div>`
+  ${deals.length ? `<div class="card list">${[...deals].sort((a, b) => (VS_ORDER[a.cp?.vs] ?? 2) - (VS_ORDER[b.cp?.vs] ?? 2)).slice(0, 5).map(dealRow).join('')}</div>`
     : `<div class="card pad small muted">아직 이번 주 행사 정보가 없어요. 할인·제철 탭에서 직접 추가하거나, Claude in Chrome 주간 작업이 채워줍니다.</div>`}
 
   <h2>🍂 ${t.getMonth() + 1}월 제철</h2>
@@ -348,7 +348,7 @@ function recipeSheet(id) {
   const row = (x) => {
     const st = x.staple ? '<span class="muted">·</span>' : x.ok ? '<span class="have">✓</span>' : x.opt ? '<span class="muted">○</span>' : '<span class="miss">✗</span>';
     const deal = !x.ok && !x.staple ? dealFor(x.k) : null;
-    const nt = [x.opt ? '선택' : '', x.note || '', deal ? `🏷 ${deal.store || ''} ${deal.price || ''}` : ''].filter(Boolean).join(' · ');
+    const nt = [x.opt ? '선택' : '', x.note || '', deal ? `🏷 ${deal.store || ''} ${deal.price || ''}${deal.cp?.vs ? ` (${VS[deal.cp.vs][1]}, 쿠팡 ${deal.cp.price || '—'})` : ''}` : ''].filter(Boolean).join(' · ');
     return `<tr><td class="s">${st}</td><td>${esc(x.n)}${nt ? `<span class="nt">${esc(nt)}</span>` : ''}</td><td class="q">${esc(amount(x, f))}</td></tr>`;
   };
   return `<div class="sheet"><h1>${esc(r.name)}<button class="x" data-act="close">✕</button></h1>
@@ -369,12 +369,17 @@ function recipeSheet(id) {
 }
 
 // ─────────────────────────── 할인·제철
+// 쿠팡 비교: cp.vs = 'mart'(마트가 쌈) | 'similar'(±10% 이내) | 'coupang'(쿠팡이 쌈) | 'na'(비교 불가)
+const VS = { mart: ['ok', '마트가 쌈'], similar: ['muted', '비슷'], coupang: ['bad', '쿠팡이 쌈'], na: ['muted', '비교 불가'] };
+const VS_ORDER = { mart: 0, similar: 1, na: 2, coupang: 3 };
+const vsBadge = (d) => d.cp?.vs ? `<span class="bdg ${VS[d.cp.vs][0]}">${VS[d.cp.vs][1]}</span>` : '';
 function dealRow(d) {
   const off = d.price && d.was ? Math.round((1 - num(d.price) / num(d.was)) * 100) : 0;
   const period = d.end ? `~${md(parseD(d.end))}` : '';
+  const cp = d.cp ? `<div class="small" style="margin-top:3px">${vsBadge(d)} <span class="muted">쿠팡</span> <b>${esc(d.cp.price || '—')}</b> <span class="muted">${esc([d.cp.name, d.cp.unit].filter(Boolean).join(' · '))}</span>${d.cp.why ? `<div class="small muted">${esc(d.cp.why)}</div>` : ''}</div>` : '';
   return `<div class="deal"><div class="main" style="flex:1;min-width:0">
       <div class="name" style="font-weight:600">${esc(d.name)}</div>
-      <div class="small muted">${[d.store, d.unit, period, d.note].filter(Boolean).map(esc).join(' · ')}${d.auto ? '' : ' · 직접 입력'}</div></div>
+      <div class="small muted">${[d.store, d.unit, period, d.note].filter(Boolean).map(esc).join(' · ')}${d.auto ? '' : ' · 직접 입력'}</div>${cp}</div>
     <div class="price">${off > 0 ? `<span class="bdg bad">${off}%</span> ` : ''}<b>${esc(d.price || '')}</b>${d.was ? `<s>${esc(d.was)}</s>` : ''}</div>
     ${d.auto ? '' : `<button class="btn sm" data-act="deldeal" data-id="${d.id}">✕</button>`}</div>`;
 }
@@ -383,12 +388,16 @@ const num = (s) => Number(String(s).replace(/[^\d.]/g, '')) || 0;
 VIEWS.market = () => {
   const E = window.EMART_DEALS || {};
   const stores = ['전체', ...(E.stores || ['칠성점', '만촌점'])];
-  const deals = allDeals().filter((d) => ui.store === '전체' || !d.store || d.store === '공통' || d.store === ui.store);
+  const deals = allDeals().filter((d) => ui.store === '전체' || !d.store || d.store === '공통' || d.store === ui.store)
+    .filter((d) => ui.vs === '전체' || d.cp?.vs === ui.vs);
+  const vsCount = (k) => allDeals().filter((d) => d.cp?.vs === k).length;
   const m = ui.month, season = window.SEASON[m] || [];
   return `<h1>할인·제철</h1>
   <p class="sub">${esc(E.source || '마트 전단')} · ${E.updatedAt ? `마지막 갱신 ${esc(E.updatedAt)}` : '자동 갱신 전'}</p>
   ${ui.store !== '전체' && E.branches?.[ui.store] ? `<p class="small muted" style="margin:6px 0 0">기준 지점: ${esc(E.branches[ui.store])}</p>` : ''}
   <div class="chips">${stores.map((s) => `<button class="chip ${ui.store === s ? 'on' : ''}" data-act="store" data-v="${esc(s)}">${esc(s)}</button>`).join('')}</div>
+  <div class="chips" style="margin-top:-4px"><span class="small muted" style="align-self:center">쿠팡 비교</span>${[['전체', '전체'], ['mart', `마트가 쌈 ${vsCount('mart')}`], ['similar', `비슷 ${vsCount('similar')}`], ['coupang', `쿠팡이 쌈 ${vsCount('coupang')}`]].map(([k, l]) => `<button class="chip ${ui.vs === k ? 'on' : ''}" data-act="vs" data-v="${k}">${l}</button>`).join('')}</div>
+  ${E.coupangAt ? `<p class="small muted" style="margin:0 0 8px">쿠팡 가격: ${esc(E.coupangAt)} 비로그인 일반가 기준(와우 할인·쿠폰 제외). 같은 단위(100g당 등)로 비교, ±10% 이내는 "비슷".</p>` : ''}
   <div class="card list">${deals.length ? deals.map(dealRow).join('') : '<div class="empty">표시할 행사 상품이 없어요.</div>'}</div>
   <details class="card pad" style="margin-top:10px"><summary style="cursor:pointer;font-weight:600">+ 행사 상품 직접 추가 (전단 보고)</summary>
     <form class="form" id="dealForm">
@@ -452,6 +461,7 @@ document.addEventListener('click', (e) => {
     case 'filter': ui.filter = el.dataset.v; render(); break;
     case 'cookcat': ui.cookCat = el.dataset.v; render(); break;
     case 'store': ui.store = el.dataset.v; render(); break;
+    case 'vs': ui.vs = el.dataset.v; render(); break;
     case 'month': ui.month = +el.dataset.v; render(); break;
     case 'add': openItem(null); break;
     case 'edit': openItem(id); break;
