@@ -83,6 +83,13 @@ details.blocks summary{padding:10px 16px;cursor:pointer;font-size:13px;color:var
 .lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .ex{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px;cursor:pointer;text-align:left;color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:2px}
 .ex svg{width:100%;height:auto;background:var(--bg);border-radius:8px}
+.ill{position:relative;width:100%;aspect-ratio:120/110;background:#fff;border-radius:8px;overflow:hidden}
+.ill img{position:absolute;inset:5%;width:90%;height:90%;object-fit:contain;transition:opacity .3s}
+.ill img+img{opacity:0}
+.ill.f2 img:first-child{opacity:0}.ill.f2 img+img{opacity:1}
+.ill .tag{position:absolute;right:6px;bottom:4px;font-size:9px;color:#8a93a6}
+.sheet .ill{max-width:340px;align-self:center;border-radius:12px}
+.p-fig .ill{height:100%;border-radius:14px}
 .ex b{font-size:14px}
 .ex small{color:var(--muted);font-size:12px}
 .filters{display:flex;gap:6px;flex-wrap:wrap}
@@ -239,6 +246,7 @@ table.log th,table.log td{text-align:left;padding:7px 6px;border-bottom:1px soli
         <li>American College of Sports Medicine. <i>ACSM's Guidelines for Exercise Testing and Prescription</i>. 12th ed. Wolters Kluwer; 2025.</li>
         <li>Tanaka H, Monahan KD, Seals DR. Age-predicted maximal heart rate revisited. <i>J Am Coll Cardiol</i>. 2001;37(1):153–156.</li>
         <li>Karvonen MJ, Kentala E, Mustala O. The effects of training on heart rate; a longitudinal study. <i>Ann Med Exp Biol Fenn</i>. 1957;35(3):307–315.</li>
+        <li>운동 일러스트: Everkinetic open data (Greg Priday), CC BY-SA 4.0 — github.com/everkinetic/data. 크기·색 조정.</li>
       </ol>
     </div>
   </section>
@@ -332,8 +340,11 @@ function fitBox(ex){
 }
 function svgFor(ex,k){return `<svg viewBox="${fitBox(ex)}" role="img" aria-label="${ex.n}">${draw(ex,lerp(ex.a,ex.b,k))}</svg>`;}
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function illHTML(ex){return `<div class="ill" role="img" aria-label="${ex.n}"><img src="img/${ex.id}-1.png" alt="" loading="lazy"><img src="img/${ex.id}-2.png" alt="" loading="lazy"><span class="tag">Everkinetic</span></div>`;}
+function figHTML(ex,k){return ex.img?illHTML(ex):svgFor(ex,k);}
+if(!reduce)setInterval(()=>{document.querySelectorAll('.ill').forEach(e=>e.classList.toggle('f2'));},1300);
 const anims=new Set();
-function animate(el,ex){const o={el,ex,svg:null};el.innerHTML=svgFor(ex,1);o.svg=el.querySelector('svg');anims.add(o);return o;}
+function animate(el,ex){if(ex.img){el.innerHTML=illHTML(ex);return null;}const o={el,ex,svg:null};el.innerHTML=svgFor(ex,1);o.svg=el.querySelector('svg');anims.add(o);return o;}
 function loop(t){for(const o of anims){if(!o.el.isConnected||o.el.closest('[hidden]')){continue;}const k=reduce?1:(1-Math.cos(t/1300*Math.PI))/2;o.svg.innerHTML=draw(o.ex,lerp(o.ex.a,o.ex.b,k));}requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
 
@@ -437,6 +448,8 @@ const E={
   cue:['무릎 모으고 골반 뒤로 말기','좌우 30초씩'],mus:'Rectus femoris, Vastus',alt:'누워서 side-lying quad stretch'},
 };
 for(const id in E) E[id].id=id;
+E.gobletSquat.note='그림은 덤벨을 아래로 든 변형 — 실제로는 가슴 앞에 세로로';E.dbRDL.note='그림은 barbell — 덤벨 2개로 같은 궤적';E.calfRaise.note='그림은 barbell — 맨몸 또는 덤벨';E.ohPress.note='그림은 앉아서 — 서서 해도 OK';E.dbRow.note='그림은 한 팔 bench row — 양손 bent-over 대신 가능';E.latPull.note='Wide grip pulldown';
+['gobletSquat','dbRDL','revLunge','calfRaise','benchPress','dbRow','ohPress','latPull','pushUp'].forEach(id=>E[id].img=1);
 
 /* ---------- program ---------- */
 const WARM={name:'Warm-up',kind:'warm',rounds:1,rest:0,items:[['bikeEasy',120],['inchworm',60],['gluteBridge',60],['revLunge',60]]};
@@ -535,7 +548,7 @@ const CATS={all:'전체',lower:'하체',upper:'상체',core:'코어',power:'파�
 let cat='all';
 function renderLib(){
   $('filters').innerHTML=Object.entries(CATS).map(([k,v])=>`<button aria-pressed="${k===cat}" data-c="${k}">${v}</button>`).join('');
-  $('lib').innerHTML=Object.values(E).filter(e=>cat==='all'||e.cat===cat).map(e=>`<button class="ex" data-ex="${e.id}">${svgFor(e,1)}<b>${e.n}</b><small>${e.k}</small></button>`).join('');
+  $('lib').innerHTML=Object.values(E).filter(e=>cat==='all'||e.cat===cat).map(e=>`<button class="ex" data-ex="${e.id}">${figHTML(e,1)}<b>${e.n}</b><small>${e.k}</small></button>`).join('');
 }
 $('filters').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;cat=b.dataset.c;renderLib();});
 
@@ -545,6 +558,7 @@ function openEx(id){
   const yt='https://www.youtube.com/results?search_query='+encodeURIComponent(e.n+' exercise proper form');
   $('sheetBody').innerHTML=`<div class="row" style="justify-content:space-between"><div><h2>${e.n}</h2><div class="muted">${e.k}</div></div><button class="btn sm ghost" id="shClose">닫기</button></div>
    <div id="shFig"></div>
+   ${e.img?`<div class="muted" style="font-size:12px">${e.note?e.note+' · ':''}Illustration: Everkinetic, CC BY-SA 4.0</div>`:''}
    <div class="eyebrow">Target</div><div>${e.mus}</div>
    <div class="eyebrow">자세 포인트</div><ul class="tight">${e.cue.map(c=>`<li>${c}</li>`).join('')}</ul>
    <div class="eyebrow">대체 동작</div><div>${e.alt}</div>
