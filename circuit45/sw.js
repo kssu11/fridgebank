@@ -1,10 +1,10 @@
 /* 네트워크 우선, 실패하면 캐시 — 헬스장 지하에서 신호가 없어도 앱이 열린다.
    Google Fonts 도 한 번 받아두면 오프라인에서 재사용. */
-const CACHE = 'circuit45-v3';
+const CACHE = 'circuit45-v4';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting())));
 self.addEventListener('activate', (e) => e.waitUntil(
-  caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
+  caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith('circuit45-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
 ));
 self.addEventListener('fetch', (e) => {
   const req = e.request;
